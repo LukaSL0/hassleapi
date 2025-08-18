@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { Drop } from "../../db/models/dropModel.js";
+import { requireAuth } from "../middleware/authentications.js";
 
 const router = Router();
 

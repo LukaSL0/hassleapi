@@ -66,13 +66,14 @@ export const requireAuthUser = async (req: AuthRequest, res: Response, next: Nex
     }
 };
 
-export const requireRole = (role: string) => async (req: AuthRequest, res: Response, next: NextFunction) => {
+const requireRole = (role: string) => async (req: AuthRequest, res: Response, next: NextFunction) => {
     await requireAuthUser(req, res, async () => {
         if (!req.dbUser) return;
         if (req.dbUser.role !== role) return res.status(403).json({ message: MSG.FORBIDDEN });
         next();
     });
 };
+export const requireAdmin = requireRole("Admin");
 
 export const tryGetAuthStatus = (req: Request): { status: "ok" | "expired" | "invalid" | "missing"; payload?: AuthPayload } => {
     const token = getToken(req);
@@ -82,5 +83,3 @@ export const tryGetAuthStatus = (req: Request): { status: "ok" | "expired" | "in
     if (!payload) return { status: "invalid" };
     return { status: "ok", payload };
 };
-
-export const requireAdmin = requireRole("Admin");

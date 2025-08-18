@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import Randomstring from "randomstring";
 import { Drop } from "../../db/models/dropModel.js";
+import { requireAdmin } from "../middleware/authentications.js";
 
 const router = Router();
 
@@ -17,8 +18,32 @@ interface GetItemBody {
     itemsSent: { id: string; size: string }[];
 }
 
+// Buscar itens por id e retornar tamanhos
+router.post("/get/item", async (req: Request<{}, {}, GetItemBody>, res: Response) => {
+    const { itemsSent } = req.body;
+    
+    try {
+        const allItems: any[] = [];
+        const allSizes: string[] = [];
+        
+        for (const item of itemsSent) {
+            const itemFound = await Drop.find({ itemId: item.id }).select("-_id -itemStock -itemCategory -itemId");
+            allItems.push(itemFound);
+            allSizes.push(item.size);
+        }
+        
+        return res.status(200).json({
+            message: "Items successfully returned.",
+            items: allItems,
+            sizes: allSizes,
+        });
+    } catch (err) {
+        return res.status(500).json({ error: "Internal Server Error", err });
+    }
+});
+
 // Adicionar novo item ao drop
-router.post("/add/item", async (req: Request<{}, {}, AddItemBody>, res: Response) => {
+router.post("/add/item", requireAdmin, async (req: Request<{}, {}, AddItemBody>, res: Response) => {
     const { name, images, stock, price, category, dropID } = req.body;
 
     try {
@@ -37,30 +62,6 @@ router.post("/add/item", async (req: Request<{}, {}, AddItemBody>, res: Response
 
         await newItem.save();
         return res.status(200).json({ message: "Item successfully added to database." });
-    } catch (err) {
-        return res.status(500).json({ error: "Internal Server Error", err });
-    }
-});
-
-// Buscar itens por id e retornar tamanhos
-router.post("/get/item", async (req: Request<{}, {}, GetItemBody>, res: Response) => {
-    const { itemsSent } = req.body;
-
-    try {
-        const allItems: any[] = [];
-        const allSizes: string[] = [];
-
-        for (const item of itemsSent) {
-            const itemFound = await Drop.find({ itemId: item.id }).select("-_id -itemStock -itemCategory -itemId");
-            allItems.push(itemFound);
-            allSizes.push(item.size);
-        }
-
-        return res.status(200).json({
-            message: "Items successfully returned.",
-            items: allItems,
-            sizes: allSizes,
-        });
     } catch (err) {
         return res.status(500).json({ error: "Internal Server Error", err });
     }
