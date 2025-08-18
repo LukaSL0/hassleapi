@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { Drop } from "../../db/models/dropsModel.js";
+import { Drop } from "../../db/models/dropModel.js";
 
 const router = Router();
 
@@ -14,7 +14,7 @@ router.post("/", async (req: Request<{}, {}, CartRequestBody>, res: Response): P
     try {
         const itemsData = await Promise.all(
             cartItems.map(async (itemId) => {
-            return await Drop.findOne({ itemId }).lean();
+                return await Drop.findOne({ itemId }).lean();
             })
         );
 

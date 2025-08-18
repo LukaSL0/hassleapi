@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
-import { User } from "../../db/models/usersModel.js";
+import { User, IUser } from "../../db/models/userModel.js";
 
-interface AuthPayload extends JwtPayload {
+export interface AuthPayload extends JwtPayload {
     userId: string;
     userName?: string;
     role?: string;
@@ -10,49 +10,77 @@ interface AuthPayload extends JwtPayload {
 
 export interface AuthRequest extends Request {
     user?: AuthPayload;
+    dbUser?: IUser;
 }
 
-interface AuthResult {
-    authStatus: boolean | string;
-    payload?: string | JwtPayload;
-}
+const MSG = {
+    NOT_LOGGED: "User not logged in.",
+    INVALID_TOKEN: "Invalid token.",
+    TOKEN_EXPIRED: "Token expired.",
+    USER_NOT_FOUND: "User not found.",
+    FORBIDDEN: "Not authorized.",
+};
 
-export const authenticateRoute = async (req: Request, res: Response, next: NextFunction): Promise<AuthResult> => {
-    const token = req.headers["x-access-token"] as string | undefined;
+const getToken = (req: Request) => {
+    const raw = req.headers["x-access-token"];
+    return typeof raw === "string" ? raw : null;
+};
 
+const decodeToken = (token: string): { payload?: AuthPayload; expired?: boolean } => {
     try {
-        if (!token) return { authStatus: false };
-
-        const jwtSecret = process.env.JWT_TOKEN;
-        if (!jwtSecret) return { authStatus: false };
-
-        const response = jwt.verify(token, jwtSecret);
-        return {
-            authStatus: true,
-            payload: response
-        };
+        const payload = jwt.verify(token, process.env.JWT_TOKEN!) as AuthPayload;
+        return { payload };
     } catch (err: any) {
-        if (err instanceof jwt.TokenExpiredError) {
-            return { authStatus: "Token Expired" };
-        } else return { authStatus: false };
+        if (err instanceof jwt.TokenExpiredError) return { expired: true };
+        return {};
     }
 };
 
-export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunction) => {
-    const token = req.headers["x-access-token"];
-    if (!token || typeof token !== "string")  return res.status(401).json({ message: "User not logged in." });
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_TOKEN!) as AuthPayload;
-        req.user = decoded;
-        next();
-    } catch {
-        return res.status(401).json({ message: "Invalid token." });
-    }
-}
-
-export const adminAuthentication = async (req: AuthRequest, res: Response, next: NextFunction) => {
-    const user = await User.findOne({ userId: req.user?.userId });
-    if (!user || user.role !== "Admin") return res.status(403).json({ message: "Não autorizado." });
+export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction) => {
+    const token = getToken(req);
+    if (!token) return res.status(401).json({ message: MSG.NOT_LOGGED });
+    const { payload, expired } = decodeToken(token);
+    if (expired) return res.status(401).json({ message: MSG.TOKEN_EXPIRED });
+    if (!payload) return res.status(401).json({ message: MSG.INVALID_TOKEN });
+    req.user = payload;
     next();
-}
+};
+
+export const requireAuthUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+        const token = getToken(req);
+        if (!token) return res.status(401).json({ message: MSG.NOT_LOGGED });
+        const { payload, expired } = decodeToken(token);
+        if (expired) return res.status(401).json({ message: MSG.TOKEN_EXPIRED });
+        if (!payload) return res.status(401).json({ message: MSG.INVALID_TOKEN });
+        req.user = payload;
+    }
+    if (req.dbUser) return next();
+    try {
+        const doc = await User.findOne({ userId: req.user!.userId });
+        if (!doc) return res.status(404).json({ message: MSG.USER_NOT_FOUND });
+        req.dbUser = doc;
+        next();
+    } catch (err) {
+        return res.status(500).json({ message: "Internal Server Error", err });
+    }
+};
+
+export const requireRole = (role: string) => async (req: AuthRequest, res: Response, next: NextFunction) => {
+    await requireAuthUser(req, res, async () => {
+        if (!req.dbUser) return;
+        if (req.dbUser.role !== role) return res.status(403).json({ message: MSG.FORBIDDEN });
+        next();
+    });
+};
+
+export const tryGetAuthStatus = (req: Request): { status: "ok" | "expired" | "invalid" | "missing"; payload?: AuthPayload } => {
+    const token = getToken(req);
+    if (!token) return { status: "missing" };
+    const { payload, expired } = decodeToken(token);
+    if (expired) return { status: "expired" };
+    if (!payload) return { status: "invalid" };
+    return { status: "ok", payload };
+};
+
+export const requireAdmin = requireRole("Admin");

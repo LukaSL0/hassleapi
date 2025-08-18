@@ -1,10 +1,10 @@
 import { Router, Request, Response } from "express";
 import Randomstring from "randomstring";
-import { User } from "../../db/models/usersModel.js";
+import { User } from "../../db/models/userModel.js";
 import { cepHandler } from "../controllers/cepController.js";
-import { Address } from "../../db/models/addressesModel.js";
+import { Address } from "../../db/models/addressModel.js";
 import { encryptData, decryptData } from "../controllers/cryptojsController.js";
-import { authenticateJWT, AuthRequest } from "../middleware/authentications.js";
+import { requireAuth, requireAuthUser, AuthRequest } from "../middleware/authentications.js";
 
 const router = Router();
 
@@ -20,7 +20,7 @@ router.post("/cep-get", async (req: Request, res: Response): Promise<Response | 
     }
 });
 
-router.post("/register", authenticateJWT, async (req: AuthRequest, res: Response): Promise<Response | void> => {
+router.post("/register", requireAuth, async (req: AuthRequest, res: Response): Promise<Response | void> => {
     const { nomeCompleto, cep, estado, cidade, bairro, rua, numero, complemento, telefone } = req.body;
     const addressInfo = { nomeCompleto, cep, estado, cidade, bairro, rua, numero, complemento, telefone };
 
@@ -41,9 +41,9 @@ router.post("/register", authenticateJWT, async (req: AuthRequest, res: Response
     }
 });
 
-router.get("/get-address", authenticateJWT, async (req: AuthRequest, res: Response): Promise<Response | void> => {
+router.get("/get-address", requireAuth, async (req: AuthRequest, res: Response): Promise<Response | void> => {
     try {
-        const addressInfo = await Address.find({ userId: req.user?.userId });
+        const addressInfo = await Address.find({ userId: req.user?.userId }).lean();
         if (!addressInfo || addressInfo.length === 0) return res.status(404).json({ message: "Address Not Found" });
 
         const decryptedAddresses: any[] = [];
@@ -64,17 +64,13 @@ router.get("/get-address", authenticateJWT, async (req: AuthRequest, res: Respon
     }
 });
 
-router.delete("/delete-address/:addressId", authenticateJWT, async (req: AuthRequest, res: Response): Promise<Response | void> => {
+router.delete("/delete-address/:addressId", requireAuth, async (req: AuthRequest, res: Response): Promise<Response | void> => {
     const { addressId } = req.params;
 
     try {
-        const addressInfo = await Address.findOne({ addressId });
-        if (!addressInfo) {
-        return res.status(404).json({ message: "Address Not Found" });
-        }
-        if (addressInfo.userId !== req.user?.userId) {
-        return res.status(403).send();
-        }
+        const addressInfo = await Address.findOne({ addressId }).lean();
+        if (!addressInfo) return res.status(404).json({ message: "Address Not Found" });
+        if (addressInfo.userId !== req.user?.userId) return res.status(403).send();
 
         await Address.deleteOne({ addressId });
         return res.sendStatus(204);
@@ -83,20 +79,19 @@ router.delete("/delete-address/:addressId", authenticateJWT, async (req: AuthReq
     }
 });
 
-router.get("/get", authenticateJWT, async (req: AuthRequest, res: Response): Promise<Response | void> => {
+router.get("/get", requireAuthUser, async (req: AuthRequest, res: Response): Promise<Response | void> => {
     try {
-        const user = await User.findOne({ userId: req.user?.userId });
-        if (!user) return res.status(404).json({ message: "User not found." });
+        const user = req.dbUser!;
 
         if (!user.addressSelected) {
-            const addressFound = await Address.findOne({ userId: user.userId });
+            const addressFound = await Address.findOne({ userId: user.userId }).lean();
             if (!addressFound) return res.sendStatus(204);
 
             await User.updateOne({ userId: user.userId }, { $set: { addressSelected: addressFound.addressId } });
             return res.sendStatus(201);
         }
 
-        const addressInfo = await Address.findOne({ addressId: user.addressSelected });
+        const addressInfo = await Address.findOne({ addressId: user.addressSelected }).lean();
         if (!addressInfo) {
             await User.updateOne({ userId: user.userId }, { $unset: { addressSelected: "" } });
             return res.status(404).json({ message: "Address Not Found" });
@@ -108,15 +103,12 @@ router.get("/get", authenticateJWT, async (req: AuthRequest, res: Response): Pro
     }
 });
 
-router.post("/select", authenticateJWT, async (req: AuthRequest, res: Response): Promise<Response | void> => {
+router.post("/select", requireAuthUser, async (req: AuthRequest, res: Response): Promise<Response | void> => {
     const { addressIdSent } = req.body;
 
     try {
-        const user = await User.findOne({ userId: req.user?.userId });
-        if (!user) return res.status(404).json({ message: "User not found." });
-
-        user.addressSelected = addressIdSent;
-        await user.save();
+        const user = req.dbUser!;
+        await User.updateOne({ userId: user.userId }, { $set: { addressSelected: addressIdSent } });
 
         return res.sendStatus(200);
     } catch (err) {
@@ -124,12 +116,12 @@ router.post("/select", authenticateJWT, async (req: AuthRequest, res: Response):
     }
 });
 
-router.get("/get-addressselected", authenticateJWT, async (req: AuthRequest, res: Response): Promise<Response | void> => {
+router.get("/get-addressselected", requireAuthUser, async (req: AuthRequest, res: Response): Promise<Response | void> => {
     try {
-        const user = await User.findOne({ userId: req.user?.userId });
-        if (!user || !user.addressSelected) return res.sendStatus(204);
+        const user = req.dbUser!;
+        if (!user.addressSelected) return res.sendStatus(204);
 
-        const addressSelected = await Address.findOne({ addressId: user.addressSelected });
+        const addressSelected = await Address.findOne({ addressId: user.addressSelected }).lean();
         if (!addressSelected) return res.sendStatus(204);
 
         const decryptedAddress = await decryptData(addressSelected.encryptedAddress);

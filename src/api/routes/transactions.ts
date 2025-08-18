@@ -1,15 +1,15 @@
 import Randomstring from "randomstring";
 import { Router, Response } from "express";
-import { Transaction } from "../../db/models/transactionsModule.js";
-import { User } from "../../db/models/usersModel.js";
+import { Transaction } from "../../db/models/transactionsModel.js";
+import { User } from "../../db/models/userModel.js";
 import { decryptData } from "../controllers/cryptojsController.js";
-import { Address } from "../../db/models/addressesModel.js";
-import { AuthRequest, authenticateJWT, adminAuthentication } from "../middleware/authentications.js";
+import { Address } from "../../db/models/addressModel.js";
+import { AuthRequest, requireAuth, requireAdmin, requireAuthUser } from "../middleware/authentications.js";
 
 const router = Router();
 
 // Listar todas as transações (admin)
-router.get("/", authenticateJWT, adminAuthentication, async (req: AuthRequest, res: Response) => {
+router.get("/", requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const allTransactions = await Transaction.find({}).select("price items -_id");
     return res.status(200).json({ allTransactions });
@@ -19,11 +19,10 @@ router.get("/", authenticateJWT, adminAuthentication, async (req: AuthRequest, r
 });
 
 // Listar todos os pedidos (admin)
-router.get("/admin", authenticateJWT, adminAuthentication, async (req: AuthRequest, res: Response) => {
+router.get("/admin", requireAdmin, async (_req: AuthRequest, res: Response) => {
   try {
-    const allOrders = await Transaction.find({})
-      .select("-userId -items -updatedAt -_id")
-      .sort({ _id: -1 });
+    const allOrders = await Transaction.find({}).select("-userId -items -updatedAt -_id").sort({ _id: -1 }).lean();
+
     return res.status(200).json({
       message: "Orders fetched successfully!",
       allOrders,
@@ -34,11 +33,11 @@ router.get("/admin", authenticateJWT, adminAuthentication, async (req: AuthReque
 });
 
 // Atualizar status do pedido (admin)
-router.put("/admin/update", authenticateJWT, adminAuthentication, async (req: AuthRequest, res: Response) => {
+router.put("/admin/update", requireAdmin, async (req: AuthRequest, res: Response) => {
   const { orderId, newStatus, orderTrackingCode } = req.body;
 
   try {
-    const order = await Transaction.findOne({ transactionId: orderId });
+    const order = await Transaction.findOne({ transactionId: orderId }).lean();
     if (!order) return res.status(404).json({ message: "Order not found." });
 
     if (newStatus === "Completed" && orderTrackingCode) {
@@ -55,11 +54,9 @@ router.put("/admin/update", authenticateJWT, adminAuthentication, async (req: Au
 });
 
 // Listar pedidos do usuário autenticado
-router.get("/orders", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.get("/orders", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const orders = await Transaction.find({ userId: req.user?.userId }).select(
-      "status transactionId price items -_id"
-    );
+    const orders = await Transaction.find({ userId: req.user?.userId }).select("status transactionId price items -_id").lean();
     return res.status(200).json({
       message: "Orders fetched successfully!",
       orders,
@@ -70,27 +67,19 @@ router.get("/orders", authenticateJWT, async (req: AuthRequest, res: Response) =
 });
 
 // Buscar detalhes de um pedido
-router.get("/order/:orderId", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.get("/order/:orderId", requireAuth, async (req: AuthRequest, res: Response) => {
   const { orderId } = req.params;
 
   try {
-    const order = await Transaction.findOne({ transactionId: orderId }).select(
-      "status transactionId price items paymentMethod userId createdAt trackingCode -_id"
-    );
-    if (!order) {
-      return res.status(404).json({ message: "Order not found." });
-    }
-    const orderAddress = await Transaction.findOne({ transactionId: orderId }).select(
-      "encryptedAddress -_id"
-    );
+    const order = await Transaction.findOne({ transactionId: orderId }).select("status transactionId price items paymentMethod userId createdAt trackingCode -_id").lean();
+    if (!order) return res.status(404).json({ message: "Order not found." });
+
+    const user = await User.findOne({ userId: order.userId }).select("email -_id").lean();
     const userReq = await User.findOne({ userId: req.user?.userId });
-    const user = await User.findOne({ userId: order.userId }).select("email -_id");
-    if (!userReq || (userReq.userId !== order.userId && userReq.role !== "Admin")) {
-      return res.status(403).json({ message: "Unauthorized." });
-    }
-    const address = orderAddress?.encryptedAddress
-      ? await decryptData(orderAddress.encryptedAddress)
-      : null;
+    if (!userReq || (userReq.userId !== order.userId && userReq.role !== "Admin")) return res.status(403).json({ message: "Unauthorized." });
+
+    const orderAddress = await Transaction.findOne({ transactionId: orderId }).select("encryptedAddress -_id").lean();
+    const address = orderAddress?.encryptedAddress ? await decryptData(orderAddress.encryptedAddress) : null;
     return res.status(200).json({
       message: "Order fetched successfully!",
       order,
@@ -103,13 +92,12 @@ router.get("/order/:orderId", authenticateJWT, async (req: AuthRequest, res: Res
 });
 
 // Solicitar novo pedido
-router.post("/request-order", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.post("/request-order", requireAuthUser, async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findOne({ userId: req.user?.userId });
-    if (!user) return res.status(404).json({ message: "User not found." });
+    const user = req.dbUser!;
 
     const { orderId, price, payment, items } = req.body;
-    const address = await Address.findOne({ addressId: user.addressSelected });
+    const address = await Address.findOne({ addressId: user.addressSelected }).lean();
     if (!address) return res.status(404).json({ message: "Address not found." });
 
     const deliveryAddress = address.encryptedAddress;
@@ -134,7 +122,7 @@ router.post("/request-order", authenticateJWT, async (req: AuthRequest, res: Res
 });
 
 // Cancelar pedido
-router.post("/cancel-order", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.post("/cancel-order", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { orderId } = req.body;
     await Transaction.findOneAndUpdate({ transactionId: orderId }, { status: "Requested" });

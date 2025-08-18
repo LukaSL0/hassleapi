@@ -5,16 +5,16 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import speakeasy from "speakeasy";
 import qrcode from "qrcode";
-import { User } from "../../db/models/usersModel.js";
+import { User } from "../../db/models/userModel.js";
 import { sendConfirmationEmail, sendResetPasswordEmail } from "../controllers/emailController.js";
-import { AuthRequest, authenticateJWT, adminAuthentication } from "../middleware/authentications.js";
+import { AuthRequest, requireAuth, requireAdmin, requireAuthUser } from "../middleware/authentications.js";
 
 const router = Router();
 
 // Listar usuários (admin)
-router.get("/", authenticateJWT, adminAuthentication, async (req: AuthRequest, res: Response) => {
+router.get("/", requireAdmin, async (req: AuthRequest, res: Response) => {
   try {
-    const allUsers = await User.find({}).select("name -_id");
+    const allUsers = await User.find({}).select("name -_id").lean();
     return res.status(200).json({ allUsers });
   } catch (err) {
     return res.status(500).json({ error: "Internal Server Error", err });
@@ -27,8 +27,8 @@ router.post("/register", async (req: Request, res: Response) => {
   if (!nameSent || !emailSent || !passwordSent) return res.status(400).json({ message: "Campos obrigatórios ausentes." });
 
   try {
-    const nameExists = await User.findOne({ name: nameSent });
-    const emailExists = await User.findOne({ email: emailSent });
+    const nameExists = await User.findOne({ name: nameSent }).lean();
+    const emailExists = await User.findOne({ email: emailSent }).lean();
     if (emailExists || nameExists) return res.status(409).json({ message: "E-mail ou usuário já registrado." });
 
     const confirmationToken = Randomstring.generate(17);
@@ -62,9 +62,8 @@ router.post("/login", async (req: Request, res: Response) => {
 
     if (user.twoFactorAuth === "ON") {
       if (!authCode || authCode === "null") return res.status(400).json({ message: "2FA Code required." });
-      
       if (!user.secretKey) return res.status(500).json({ message: "2FA secret key not set for user." });
-      
+
       const isVerified = speakeasy.totp.verify({
         secret: user.secretKey,
         encoding: "base32",
@@ -87,7 +86,7 @@ router.post("/login", async (req: Request, res: Response) => {
 router.put("/register/confirm/:confirmationCode", async (req: Request, res: Response) => {
   const code = req.params.confirmationCode;
   try {
-    const user = await User.findOne({ confirmationToken: code });
+    const user = await User.findOne({ confirmationToken: code }).lean();
     if (!user) return res.status(400).json({ message: "Confirmation Token Not Found." });
 
     await User.updateOne({ confirmationToken: code }, { status: "Active", $unset: { confirmationToken: "" } });
@@ -153,30 +152,29 @@ router.put("/resetpassword/:resetPasswordToken", async (req: Request, res: Respo
 });
 
 // Trocar senha logado
-router.put("/changepassword", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.put("/changepassword", requireAuth, async (req: AuthRequest, res: Response) => {
   const { oldPasswordSent, newPasswordSent } = req.body;
   try {
     const user = await User.findOne({ userId: req.user!.userId });
     if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
     const oldIsMatch = await bcrypt.compare(oldPasswordSent, user.password);
     const newIsMatch = await bcrypt.compare(newPasswordSent, user.password);
-    if (!oldIsMatch) return res.status(401).json({ message: "Old Password doesnt match." });
+    if (!oldIsMatch) return res.status(401).json({ message: "A senha é igual a atual." });
 
-    if (newIsMatch) return res.status(400).json({ message: "This is your actual password." });
+    if (newIsMatch) return res.status(400).json({ message: "Está é sua senha atual." });
 
     user.password = await bcrypt.hash(newPasswordSent, 10);
     await user.save();
-    return res.status(200).json({ message: "User password changed successfully." });
+    return res.status(200).json({ message: "Senha alterada com sucesso." });
   } catch (err) {
     return res.status(500).json({ error: "Internal Server Error", err });
   }
 });
 
 // Dados da conta
-router.get("/account", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.get("/account", requireAuthUser, async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findOne({ userId: req.user!.userId });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = req.dbUser!;
 
     return res.status(200).json({
       message: "Data fetched successfully",
@@ -193,11 +191,9 @@ router.get("/account", authenticateJWT, async (req: AuthRequest, res: Response) 
 });
 
 // 2FA - QR Code
-router.get("/account/2fa", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.get("/account/2fa", requireAuthUser, async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findOne({ userId: req.user!.userId });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
+    const user = req.dbUser!;
     if (!user.secretKey) return res.status(400).json({ message: "2FA secret key not set for user." });
 
     const qrCodeURL = `otpauth://totp/hassle:${user.email}?secret=${encodeURIComponent(user.secretKey)}`;
@@ -216,11 +212,10 @@ router.get("/account/2fa", authenticateJWT, async (req: AuthRequest, res: Respon
 });
 
 // 2FA - Toggle
-router.put("/account/toggle-2fa", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.put("/account/toggle-2fa", requireAuthUser, async (req: AuthRequest, res: Response) => {
   const { toggleStatus } = req.body;
   try {
-    const user = await User.findOne({ userId: req.user!.userId });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = req.dbUser!;
 
     user.twoFactorAuth = toggleStatus === "OFF" ? "OFF" : "ON";
     await user.save();
@@ -231,11 +226,10 @@ router.put("/account/toggle-2fa", authenticateJWT, async (req: AuthRequest, res:
 });
 
 // 2FA - Regenerar chave
-router.put("/account/regenerate-2fa", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.put("/account/regenerate-2fa", requireAuthUser, async (req: AuthRequest, res: Response) => {
   try {
-    const user = await User.findOne({ userId: req.user!.userId });
-    if (!user) return res.status(404).json({ message: "User not found" });
-    
+    const user = req.dbUser!;
+
     user.secretKey = speakeasy.generateSecret().base32;
     await user.save();
     return res.status(200).json({ message: "2FA Secret Key changed." });
@@ -245,7 +239,7 @@ router.put("/account/regenerate-2fa", authenticateJWT, async (req: AuthRequest, 
 });
 
 // Editar quantidade do item no carrinho
-router.put("/cart/edit-amount", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.put("/cart/edit-amount", requireAuth, async (req: AuthRequest, res: Response) => {
   const { ordem, amountSent } = req.body;
   try {
     await User.findOneAndUpdate(
@@ -259,12 +253,10 @@ router.put("/cart/edit-amount", authenticateJWT, async (req: AuthRequest, res: R
 });
 
 // Remover item do carrinho
-router.delete("/cart/delete-item/:ordem", authenticateJWT, async (req: AuthRequest, res: Response) => {
+router.delete("/cart/delete-item/:ordem", requireAuthUser, async (req: AuthRequest, res: Response) => {
   const { ordem } = req.params;
   try {
-    const user = await User.findOne({ userId: req.user!.userId });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
+    const user = req.dbUser!;
     if (!Array.isArray(user.cartItems)) return res.status(400).json({ message: "Cart is empty or not available." });
 
     const index = Number(ordem);

@@ -13,30 +13,30 @@ API para e-commerce (Loja de Roupas) construída em TypeScript com foco em segur
 - Runtime: Node.js (ESM)
 - Linguagem: TypeScript (compilado para `dist/`)
 - Framework: Express
-- Banco: MongoDB (Mongoose)
+- Banco de Dados: MongoDB (Mongoose)
 - Segurança: JWT, Bcrypt, Rate Limit
 - Auth 2FA: Speakeasy + QRCode
 - Criptografia: CryptoJS
-- Testes: Jest (ts-jest)
+- Testes: JEST (ts-jest)
 - Email: Nodemailer (Gmail / SMTP)
 
 ## Principais Recursos
-- Cadastro/Login + confirmação por e-mail
+- Cadastro/Login + Confirmação por E-mail
 - Recuperação e redefinição de senha
-- Autenticação JWT + middleware de autorização (Admin)
+- Autenticação JWT + Middleware de autorização (Admin)
 - 2FA (Google Authenticator compatível)
 - Carrinho de compras
 - Drops / Produtos
 - Endereços criptografados
-- Testes unitários para controllers utilitários (`email`, `cep`, `crypto`)
+- Testes unitários para controladores utilitários (`email`, `cep`, `crypto`)
 
 ## Arquitetura & Padrões
 - Separação por domínio (`routes/`, `controllers/`, `middleware/`, `db/`)
-- Rotas minimalistas: lógica delegada a controllers/helpers
+- Rotas minimalistas: Lógica delegada a controladores
 - Modelos Mongoose com `timestamps`
 - Uso de `.lean()` para queries somente leitura
 - Import ESM com extensão `.js` (NodeNext)
-- Cache de recursos (ex.: transporter de e-mail)
+- Cache de recursos (ex.: Transporter de e-mail)
 
 ## Segurança
 - Hash de senha: Bcrypt

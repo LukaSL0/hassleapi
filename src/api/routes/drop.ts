@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import Randomstring from "randomstring";
-import { Drop } from "../../db/models/dropsModel.js";
+import { Drop } from "../../db/models/dropModel.js";
 
 const router = Router();
 
@@ -22,9 +22,8 @@ router.post("/add/item", async (req: Request<{}, {}, AddItemBody>, res: Response
     const { name, images, stock, price, category, dropID } = req.body;
 
     try {
-        const nameExists = await Drop.findOne({ itemName: name });
+        const nameExists = await Drop.findOne({ itemName: name }).lean();
         if (nameExists) return res.status(409).json({ message: "This item already exists." });
-
 
         const newItem = new Drop({
             itemName: name,
