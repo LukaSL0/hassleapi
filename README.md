@@ -47,6 +47,7 @@ API para e-commerce (Modelo Treino) construída em TypeScript com foco em segura
 
 ## Boas Práticas Adotadas
 - Tipagem forte em handlers
+- Centralização da conexão ao banco
 - Erros tratados e respostas consistentes
 - Funções puras para utilidades (testáveis)
 - Evita lógica duplicada (middlewares reutilizáveis)
