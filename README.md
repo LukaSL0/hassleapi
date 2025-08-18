@@ -1,6 +1,6 @@
 # Hassle Company API
 
-API para e-commerce (Loja de Roupas) construída em TypeScript com foco em segurança, testabilidade (JEST) e escalabilidade.
+API para e-commerce (Modelo Treino) construída em TypeScript com foco em segurança, testabilidade (JEST) e escalabilidade.
 
 ## Sumário
 - [Stack](#stack)
@@ -17,7 +17,7 @@ API para e-commerce (Loja de Roupas) construída em TypeScript com foco em segur
 - Segurança: JWT, Bcrypt, Rate Limit
 - Auth 2FA: Speakeasy + QRCode
 - Criptografia: CryptoJS
-- Testes: JEST (ts-jest)
+- Testes unitários: JEST (ts-jest)
 - Email: Nodemailer (Gmail / SMTP)
 
 ## Principais Recursos
@@ -28,21 +28,20 @@ API para e-commerce (Loja de Roupas) construída em TypeScript com foco em segur
 - Carrinho de compras
 - Drops / Produtos
 - Endereços criptografados
-- Testes unitários para controladores utilitários (`email`, `cep`, `crypto`)
+- Testes unitários para controladores (`email`, `cep`, `crypto`)
 
 ## Arquitetura & Padrões
 - Separação por domínio (`routes/`, `controllers/`, `middleware/`, `db/`)
 - Rotas minimalistas: Lógica delegada a controladores
-- Modelos Mongoose com `timestamps`
 - Uso de `.lean()` para queries somente leitura
 - Import ESM com extensão `.js` (NodeNext)
 - Cache de recursos (ex.: Transporter de e-mail)
 
 ## Segurança
-- Hash de senha: Bcrypt
+- Hash de senha com `Bcrypt`
 - Token JWT com expiração
-- 2FA TOTP
-- Criptografia de endereço (dados sensíveis)
+- Autenticação de 2 fatos (2FA TOTP)
+- Dados sensíveis criptografados
 - Seleção estrita de campos (`.select`)
 - Evita mutação acidental via `ReadonlyArray`
 
