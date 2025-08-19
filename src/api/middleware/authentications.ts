@@ -75,7 +75,7 @@ const requireRole = (role: string) => async (req: AuthRequest, res: Response, ne
 };
 export const requireAdmin = requireRole("Admin");
 
-export const tryGetAuthStatus = (req: Request): { status: "ok" | "expired" | "invalid" | "missing"; payload?: AuthPayload } => {
+export const getAuthStatus = (req: Request): { status: "ok" | "expired" | "invalid" | "missing"; payload?: AuthPayload } => {
     const token = getToken(req);
     if (!token) return { status: "missing" };
     const { payload, expired } = decodeToken(token);
