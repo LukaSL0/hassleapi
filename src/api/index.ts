@@ -8,7 +8,7 @@ import addressesRouter from "./routes/addresses.js";
 
 const router = Router();
 
-const routeMap: ReadonlyArray<[path: string, r: ReturnType<typeof Router>]> = [
+const routeMap: [string, Router][] = [
     ["/auth", authRouter],
     ["/cart", cartRouter],
     ["/users", usersRouter],

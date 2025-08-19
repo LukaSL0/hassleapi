@@ -7,7 +7,7 @@ import speakeasy from "speakeasy";
 import qrcode from "qrcode";
 import { User } from "../../db/models/userModel.js";
 import { sendConfirmationEmail, sendResetPasswordEmail } from "../controllers/emailController.js";
-import { AuthRequest, requireAuth, requireAdmin, requireAuthUser } from "../middleware/authentications.js";
+import { AuthRequest, requireAuth, requireAdmin, requireAuthUser } from "../middlewares/authentications.js";
 
 const router = Router();
 

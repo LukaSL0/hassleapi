@@ -4,7 +4,7 @@ import { Transaction } from "../../db/models/transactionModel.js";
 import { User } from "../../db/models/userModel.js";
 import { decryptData } from "../controllers/cryptojsController.js";
 import { Address } from "../../db/models/addressModel.js";
-import { AuthRequest, requireAuth, requireAdmin, requireAuthUser } from "../middleware/authentications.js";
+import { AuthRequest, requireAuth, requireAdmin, requireAuthUser } from "../middlewares/authentications.js";
 
 const router = Router();
 

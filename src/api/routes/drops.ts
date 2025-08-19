@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import Randomstring from "randomstring";
 import { Drop } from "../../db/models/dropModel.js";
-import { requireAdmin } from "../middleware/authentications.js";
+import { requireAdmin } from "../middlewares/authentications.js";
 
 const router = Router();
 

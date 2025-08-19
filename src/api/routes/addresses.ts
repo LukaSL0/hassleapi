@@ -4,7 +4,7 @@ import { User } from "../../db/models/userModel.js";
 import { cepHandler } from "../controllers/cepController.js";
 import { Address } from "../../db/models/addressModel.js";
 import { encryptData, decryptData } from "../controllers/cryptojsController.js";
-import { requireAuth, requireAuthUser, AuthRequest } from "../middleware/authentications.js";
+import { requireAuth, requireAuthUser, AuthRequest } from "../middlewares/authentications.js";
 
 const router = Router();
 
