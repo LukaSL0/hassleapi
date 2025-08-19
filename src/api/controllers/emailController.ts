@@ -6,7 +6,7 @@ const getTransport = (): Transporter => {
     if (cachedTransport) return cachedTransport;
 
     const { MAIL_USER, MAIL_PASS } = process.env;
-    if (!MAIL_USER || !MAIL_PASS) throw new Error("MAIL_USER / MAIL_PASS não configurados.");
+    if (!MAIL_USER || !MAIL_PASS) throw new Error("Erro nos dados do e-mail.");
 
     cachedTransport = nodemailer.createTransport({
         service: "Gmail",
@@ -25,6 +25,7 @@ const sendEmail = async (to: string, subject: string, html: string): Promise<voi
 };
 
 export const sendConfirmationEmail = async (name: string, email: string, confirmationCode: string): Promise<void> => {
+    if (!email) return;
     const html = `
         <h1>Olá, ${name}!</h1>
         <p>Confirme seu e-mail clicando no link abaixo:</p>
@@ -34,6 +35,7 @@ export const sendConfirmationEmail = async (name: string, email: string, confirm
 };
 
 export const sendResetPasswordEmail = async (name: string, email: string, resetToken: string): Promise<void> => {
+    if (!email) return;
     const html = `
         <h1>Olá, ${name}!</h1>
         <p>Redefina sua senha clicando no link abaixo (expira em 24h):</p>

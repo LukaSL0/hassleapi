@@ -1,4 +1,4 @@
-import { encryptData, decryptData } from "../cryptojsController.js";
+import { encryptData, decryptData } from "../cryptojsController";
 
 process.env.ENCRYPTION_KEY = "encryption_key_test";
 
@@ -23,5 +23,30 @@ describe("Encrypt e Decrypt Controller", () => {
 
         const decrypted = decryptData<string>(encrypted);
         expect(decrypted).toBe(original);
+    });
+
+    it("Lida com erro se ENCRYPTION_KEY não estiver definida (Criptografar)", () => {
+        const oldKey = process.env.ENCRYPTION_KEY;
+        delete process.env.ENCRYPTION_KEY;
+        expect(() => encryptData("test")).toThrow(/ENCRYPTION_KEY|chave/i);
+        process.env.ENCRYPTION_KEY = oldKey;
+    });
+
+    it("Lida com erro se ENCRYPTION_KEY não estiver definida (Descriptografar)", () => {
+        const oldKey = process.env.ENCRYPTION_KEY;
+        delete process.env.ENCRYPTION_KEY;
+        expect(() => decryptData("qualquer")).toThrow(/ENCRYPTION_KEY|chave/i);
+        process.env.ENCRYPTION_KEY = oldKey;
+    });
+
+    it("Lida com erro ao descriptografar string inválida", () => {
+        expect(() => decryptData("string_invalida")).toThrow();
+    });
+
+    it("Lida com erro ao descriptografar dado corrompido", () => {
+        const original = "corrompido";
+        const encrypted = encryptData(original);
+        const broken = encrypted.slice(0, -5) + "xxxxx";
+        expect(() => decryptData(broken)).toThrow();
     });
 });

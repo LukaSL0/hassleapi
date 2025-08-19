@@ -1,6 +1,6 @@
 import Randomstring from "randomstring";
 import { Router, Response } from "express";
-import { Transaction } from "../../db/models/transactionsModel.js";
+import { Transaction } from "../../db/models/transactionModel.js";
 import { User } from "../../db/models/userModel.js";
 import { decryptData } from "../controllers/cryptojsController.js";
 import { Address } from "../../db/models/addressModel.js";

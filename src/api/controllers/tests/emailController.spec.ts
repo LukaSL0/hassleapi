@@ -10,11 +10,12 @@ jest.mock("nodemailer", () => ({
     default: { createTransport: createTransportMock },
 }));
 
-import { sendConfirmationEmail, sendResetPasswordEmail } from "../emailController.js";
+import { sendConfirmationEmail, sendResetPasswordEmail } from "../emailController";
 
 describe("Email Controller", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        sendMailMock.mockReset();
     });
 
     it("Envia e-mail de confirmação com conteúdo correto", async () => {
@@ -26,9 +27,29 @@ describe("Email Controller", () => {
     });
 
     it("Envia e-mail de redefinição com conteúdo correto", async () => {
-        await sendResetPasswordEmail("Luka", "user@example.com", "RESET999");
+        await sendResetPasswordEmail("Luka", "user@example.com", "RESET123");
         const args = sendMailMock.mock.calls[0][0];
         expect(args.subject).toBe("[Hassle] Redefinição de senha");
-        expect(args.html).toContain("RESET999");
+        expect(args.html).toContain("RESET123");
+    });
+
+    it("Lida com erro ao enviar e-mail de confirmação", async () => {
+        sendMailMock.mockImplementationOnce(() => { throw new Error("Falha no envio do e-mail de confirmação"); });
+        await expect(sendConfirmationEmail("Luka", "user@example.com", "ERR123")).rejects.toThrow("Falha no envio de e-mail.");
+    });
+
+    it("Lida com erro ao enviar e-mail de redefinição", async () => {
+        sendMailMock.mockImplementationOnce(() => { throw new Error("Falha no envio do e-mail de redefinição"); });
+        await expect(sendResetPasswordEmail("Luka", "user@example.com", "ERR123")).rejects.toThrow("Falha no envio de e-mail.");
+    });
+
+    it("Não executa `sendMail` se e-mail for inválido (Confirmação)", async () => {
+        await expect(sendConfirmationEmail("Luka", "", "INVALIDEMAIL")).resolves.toBeUndefined();
+        expect(sendMailMock).not.toHaveBeenCalled();
+    });
+
+    it("Não executa `sendMail` se e-mail for inválido (Redefinição)", async () => {
+        await expect(sendResetPasswordEmail("Luka", "", "INVALIDEMAIL")).resolves.toBeUndefined();
+        expect(sendMailMock).not.toHaveBeenCalled();
     });
 });

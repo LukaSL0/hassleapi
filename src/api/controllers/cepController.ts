@@ -50,7 +50,7 @@ interface Endereco {
 type SiglaEstado = keyof typeof estados;
 const getNomeEstado = (sigla: SiglaEstado): string => estados[sigla];
 
-const cepHandler = async (cepSent: string): Promise<Endereco | null> => {
+export const cepHandler = async (cepSent: string): Promise<Endereco | null> => {
     try {
         const cepLimpo = cepSent.replace(/\D/g, "");
 
@@ -73,5 +73,3 @@ const cepHandler = async (cepSent: string): Promise<Endereco | null> => {
         return null;
     }
 };
-
-export { cepHandler };
