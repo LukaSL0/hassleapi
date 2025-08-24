@@ -11,6 +11,7 @@ API para e-commerce (Modelo Treino) construída em TypeScript com foco em segura
 
 ## Stack
 - Runtime: Node.js (ESM)
+- Integração com Docker
 - Linguagem: TypeScript (compilado para `dist/`)
 - Framework: Express
 - Banco de Dados: MongoDB (Mongoose)

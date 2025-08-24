@@ -1,7 +1,7 @@
 import { Router } from "express";
 import authRouter from "./routes/auth.js";
 import usersRouter from "./routes/users.js";
-import dropRouter from "./routes/drops.js";
+import dropsRouter from "./routes/drops.js";
 import cartRouter from "./routes/cart.js";
 import transactionsRouter from "./routes/transactions.js";
 import addressesRouter from "./routes/addresses.js";
@@ -12,7 +12,7 @@ const routeMap: [string, Router][] = [
     ["/auth", authRouter],
     ["/cart", cartRouter],
     ["/users", usersRouter],
-    ["/drop", dropRouter],
+    ["/drop", dropsRouter],
     ["/transactions", transactionsRouter],
     ["/addresses", addressesRouter],
 ];
